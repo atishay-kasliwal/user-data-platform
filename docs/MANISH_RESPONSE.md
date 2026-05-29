@@ -32,9 +32,10 @@ VAULT_OWNER + scoped + dev-token hierarchy, client-side PBKDF2 BYOK,
 ciphertext-only `pkm_blobs`, the `/api/v1` developer surface, the
 hosted MCP server, Agent Kai. Three of my v0's four moves contradicted
 the non-negotiables in `AGENTS.md`. So I stopped building a parallel
-path. The runtime is still Kai-first; the One/Nav migration is the
-direction; my work plugs in *below* all of them as the external
-developer on-ramp that doesn't exist yet.
+path. (Side note: production `/health` now reports `One` as the
+primary runtime with Kai as a specialist — the migration `docs/vision/`
+flagged as future is already live. My work plugs in *below* all of
+them as the external developer on-ramp that doesn't exist yet.)
 
 **What I shipped this week:**
 
@@ -60,6 +61,35 @@ developer on-ramp that doesn't exist yet.
 There is no end-to-end external-developer sample in `hushh-research`
 today. That was the real gap, and it's where the "few samples with
 extreme ease of use" lands cleanly without duplicating shipped work.
+
+**Verified live against production today.** I issued a dev token
+through `hushh.ai/developers`, pointed the sample at the production
+Cloud Run backend, and ran the full flow: token validation → scope
+discovery → consent request → user approval in Kai → status
+transition to `granted` with a real signed `HCT:` capability token.
+Transcript with redacted tokens lives at
+`samples/external-agent/RUN_LIVE.md`. While doing this, the sample
+caught **three real bugs in the production developer surface**:
+
+1. The production backend's `request-consent` response emits a
+   `request_url` pointing at `uat.kai.hushh.ai` — same UAT/prod
+   inline split visible in the example configs on
+   `hushh.ai/developers`. A developer following the link blindly
+   lands in an environment that doesn't contain their request.
+2. `/health` says `One` is primary now, but `docs/vision/README.md`
+   still describes the runtime as Kai-first. Docs lag the runtime.
+3. **High-severity:** `scoped-export` rejects email/phone user_ids
+   that every other `/api/v1` endpoint accepts. There's no
+   documented way for a raw `/api/v1` caller to resolve email →
+   Firebase UID. This is the loop-closing bug for any external
+   developer — you can request and receive consent with an email
+   but the *only* call that actually returns data rejects the same
+   identifier. Two-line fix on your side (either resolve in
+   scoped-export, or expose a resolve-identifier endpoint).
+
+I'd rather discover these for you than not. The sample being the
+thing that surfaced them is itself the point — that's what a real
+developer on-ramp looks like.
 
 **Workspace + code:**
 - Repo: https://github.com/atishay-kasliwal/user-data-platform

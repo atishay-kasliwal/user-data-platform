@@ -34,7 +34,7 @@ async def startup() -> None:
     app.state.connector = hushh.Connector.fresh()
     app.state.client = hushh.HushhClient(
         mode=os.getenv("MODE", "mock"),
-        base_url=os.getenv("CONSENT_API_URL", "https://api.uat.hushh.ai"),
+        base_url=os.getenv("CONSENT_API_URL", "https://consent-protocol-f2gsa4kfsq-uc.a.run.app"),
         developer_token=os.getenv("HUSHH_DEVELOPER_TOKEN", ""),
         user_id=os.getenv("USER_ID", "mock-user"),
         user_country_iso2=os.getenv("USER_COUNTRY_ISO2") or None,
