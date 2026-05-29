@@ -51,7 +51,7 @@ end-to-end without an account. `live` mode talks to
 | Var | Required | Default | Notes |
 |---|---|---|---|
 | `MODE` | no | `mock` | `mock` or `live` |
-| `CONSENT_API_URL` | live only | `https://api.uat.hushh.ai` | base URL for `/api/v1` |
+| `CONSENT_API_URL` | live only | `https://consent-protocol-f2gsa4kfsq-uc.a.run.app` (prod). Use `https://api.uat.hushh.ai` for UAT. | base URL for `/api/v1` |
 | `HUSHH_DEVELOPER_TOKEN` | live only | — | from `/developers` in the Hushh app |
 | `USER_ID` | live only | — | Firebase UID, email, or phone (with `USER_COUNTRY_ISO2`) |
 | `USER_COUNTRY_ISO2` | live only if `USER_ID` is a phone number | — | e.g. `US` |
