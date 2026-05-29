@@ -46,28 +46,40 @@ This is the "extreme ease of use with a few samples" surface you
 asked for. There is no end-to-end external-developer sample in
 `hushh-research` today — that was the real gap.
 
-**Repo + workspace:**
-- Code: https://github.com/atishay-kasliwal/user-data-platform
-- Branch with this week's work: `samples/external-agent`
+**Workspace + code:**
+- Repo: https://github.com/atishay-kasliwal/user-data-platform
+- Branch: `samples/external-agent`
 - Claude Code session driving the work: [will share in reply]
 
-**Three questions before I land it in your research repo:**
+**One thing I want to flag honestly.** You asked me to check this
+into the PR at `hushh-research`. I held off and pushed to my own
+fork instead. The reason: your `AGENTS.md` is explicit about not
+opening parallel paths against shipped contracts, and Kushal's
+agent-revamp train (PR #615 and the open `kushaltrivedi/*` branches)
+is actively in motion in the same surface area. Opening a PR there
+without first aligning on placement (is this `samples/` in the
+monorepo, or a separate `hushh-labs/hushh-agent-sample` you can
+point developers at?) seemed worse than asking. I can open the PR
+as soon as you say go — happy to default to your call.
 
-1. Do you want this PR'd into `hushh-research` as
-   `samples/external-agent/` and `samples/claude-desktop/`, or kept
-   as a standalone `hushh-labs/hushh-agent-sample` you can point
-   developers at independently?
-2. Can your team issue me a `HUSHH_DEVELOPER_TOKEN` in UAT (or point
-   me at someone with a vault I can read for testing)? Live mode is
-   ready; only env is missing.
-3. You mentioned the problem statement you'd given me — could you
-   resend it? I want to make sure the principles note maps to it
-   directly rather than paraphrasing.
+**Three things I'd like from you to close the loop:**
 
-Happy to hop on a call when you're back, or keep going async — I'm
-making progress every day. Will not push to `consent-protocol/`
-without alignment with Kushal; his recent revamp (PR #615) is on my
-radar.
+1. **Landing surface.** PR into `hushh-research` under
+   `samples/external-agent/` + `samples/claude-desktop/`, or carve
+   it out as a standalone `hushh-labs/hushh-agent-sample` repo? I
+   have a preference for standalone (clean visibility, doesn't add
+   to the PR train), but I'll do whichever you want.
+2. **`HUSHH_DEVELOPER_TOKEN`** in UAT, or a pointer to someone with
+   a vault I can read for testing. Live mode is wired and verified
+   in mock; only env is missing.
+3. **The original problem statement** — you referenced *"the problem
+   statement I had given"* but I don't have it saved. Could you
+   resend? Want to make sure the principles note maps cleanly
+   instead of paraphrasing.
+
+Happy to hop on a call when you're back, or keep going async. I
+won't push to `consent-protocol/` without alignment with Kushal —
+his revamp is on my radar.
 
 Best,
 Atishay
