@@ -15,7 +15,7 @@ import asyncpg
 import redis.asyncio as aioredis
 from aiokafka import AIOKafkaProducer
 from fastapi import Depends, FastAPI, HTTPException, Header, Query, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 app = FastAPI(title="User Profile Service", version="1.0.0")
 
@@ -29,9 +29,21 @@ KAFKA_BROKERS = os.getenv("KAFKA_BROKERS", "kafka:9092")
 # ---------------------------------------------------------------------------
 # Startup / shutdown
 # ---------------------------------------------------------------------------
+async def _init_connection(conn: asyncpg.Connection):
+    # By default asyncpg returns JSONB as str. Register a codec so it
+    # returns/accepts Python dicts directly.
+    await conn.set_type_codec(
+        "jsonb",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
+    )
+
 @app.on_event("startup")
 async def startup():
-    app.state.db    = await asyncpg.create_pool(DB_DSN, min_size=5, max_size=20)
+    app.state.db    = await asyncpg.create_pool(
+        DB_DSN, min_size=5, max_size=20, init=_init_connection,
+    )
     app.state.cache = aioredis.from_url(REDIS_URL, decode_responses=True)
     app.state.kafka = AIOKafkaProducer(bootstrap_servers=KAFKA_BROKERS)
     await app.state.kafka.start()
@@ -62,7 +74,7 @@ async def cache_key(user_id: str) -> str:
 # Models
 # ---------------------------------------------------------------------------
 class CreateUserRequest(BaseModel):
-    email: EmailStr
+    email: str
     phone: str | None = None
     profile: dict[str, Any] = {}
 
@@ -89,11 +101,11 @@ async def create_user(body: CreateUserRequest, db=Depends(get_db)):
     await db.execute(
         """
         INSERT INTO users (id, identity, profile)
-        VALUES ($1, $2::jsonb, $3::jsonb)
+        VALUES ($1, $2, $3)
         """,
         uuid.UUID(user_id),
-        json.dumps(identity),
-        json.dumps(body.profile),
+        identity,
+        body.profile,
     )
 
     await emit("user.created", {"user_id": user_id, "identity": identity})
@@ -171,34 +183,33 @@ async def update_user(user_id: str, body: UpdateUserRequest, db=Depends(get_db))
 
         old_value = current
         if len(parts) == 2:
-            # Nested key update: jsonb_set(column, '{key}', value)
-            new_json = json.dumps(body.value)
+            # Nested key update via jsonb_set; path arg is text[], passed as a Python list
             await db.execute(
                 f"""
                 UPDATE users
-                SET {column} = jsonb_set({column}, $1, $2::jsonb)
+                SET {column} = jsonb_set({column}, $1::text[], $2)
                 WHERE id = $3
                 """,
-                f"{{{parts[1]}}}",
-                new_json,
+                [parts[1]],
+                body.value,
                 uuid.UUID(user_id),
             )
         else:
             await db.execute(
-                f"UPDATE users SET {column} = $1::jsonb WHERE id = $2",
-                json.dumps(body.value),
+                f"UPDATE users SET {column} = $1 WHERE id = $2",
+                body.value,
                 uuid.UUID(user_id),
             )
 
         await db.execute(
             """
             INSERT INTO user_history (user_id, field_path, old_value, new_value, changed_by)
-            VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
+            VALUES ($1, $2, $3, $4, $5)
             """,
             uuid.UUID(user_id),
             body.field_path,
-            json.dumps(old_value),
-            json.dumps(body.value),
+            old_value,
+            body.value,
             uuid.UUID(body.changed_by),
         )
 

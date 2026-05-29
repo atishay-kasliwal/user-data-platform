@@ -96,6 +96,11 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   ingestion-service:
     build: ./services/ingestion-service
@@ -106,7 +111,8 @@ services:
     ports:
       - "8002:8000"
     depends_on:
-      - user-profile-service
+      user-profile-service:
+        condition: service_healthy
 
   audit-logging-service:
     build: ./services/audit-logging-service
