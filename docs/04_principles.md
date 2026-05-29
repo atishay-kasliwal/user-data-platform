@@ -78,6 +78,40 @@ work is downstream of what's already shipped:
   invariants in language an external developer can adopt without
   reading 559 lines of `consent-protocol.md`.
 
+## Why these invariants also make this the cheapest, fastest path
+
+The four invariants are usually argued on trust grounds. They also
+happen to be the structurally lowest-cost shape for a personal-agent
+platform at scale. The argument:
+
+| Invariant | Cost / latency consequence |
+|---|---|
+| **1. Key boundary on the user** | The server holds ciphertext, so per-user storage is commoditizable cold storage. No PII insurance load, no row-level encryption tax, no "right-to-erasure" infrastructure beyond a delete row. Storage cost converges to bytes-on-disk. |
+| **2. Identity ≠ consent** | Capability tokens are signed and stateless. No DB lookup per request to validate a grant — verification is a signature check (microseconds). Compare to row-level security policies that re-evaluate on every read. |
+| **3. Scope as the unit** | Reads return only the requested scope's ciphertext + wrapped key. No over-fetching. For LLM-fronted agents, this directly reduces input token count → reduces $/query. The platform never pays compute for "we sent more than we needed." |
+| **4. Receipts** | Append-only events are write-once, query-on-demand. No periodic full-table scans, no synchronous logging that adds tail latency to the hot read. Audit becomes a cold archive cost, not a runtime cost. |
+
+The compounding effect: the **server never decrypts**, so the server
+runtime can run on cheap stateless compute, scaled per-region, with
+zero per-read crypto on the platform's CPU. The connector (the
+developer's agent, or the user's device) absorbs that cost — but it
+absorbs it for *one user at a time*, where it is negligible. The
+platform's marginal cost per read approaches the cost of one network
+round-trip plus a signature verification.
+
+That's the structural reason a consent-first platform can be faster
+and cheaper than the incumbent ad-tech / data-broker model, not just
+safer. The latter pays compute to read every row on every query; the
+former pays compute to verify a signature and stream a blob.
+
+This is also why the developer-facing surface needs to be tiny: the
+faster a third-party agent can stand up against the platform, the
+faster the platform's network effect compounds. The
+[`samples/external-agent/`](../samples/external-agent/) in this repo
+is a benchmark for "how small can the developer surface be" — it
+boots, requests consent, decrypts, and answers in one file of HTTP
+and one file of crypto.
+
 ## What this is not
 
 - Not a proposal to change the consent protocol.
