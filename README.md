@@ -39,6 +39,25 @@ Services:
 - Kafka UI: http://localhost:8080
 - PgAdmin: http://localhost:5050
 
+## Verified end-to-end
+
+The stack was brought up via `docker compose up -d --build` and exercised:
+
+```
+POST /users                              → 201 {id: ...}
+GET  /users/{id}      (cache miss)       → full row from Postgres
+GET  /users/{id}      (cache hit)        → same row from Redis
+GET  /users/{id}?scope=profile.name      → response filtered to scope
+POST /ingest oauth_profile               → 2 fields updated, 1 deduped
+POST /ingest location_update             → 1 field updated
+GET  /users/{id}                         → merged state across sources
+GET  /users/{id}/history                 → 3 entries with old/new values
+```
+
+Kafka topics produced: `user.created`, `user.updated`, `user.accessed`.
+`audit-logging-service` consumed every event and emitted structured JSON
+records to stdout (production target: S3 Parquet via Kinesis Firehose).
+
 ## Design
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the full system design.
