@@ -1,67 +1,54 @@
-# User Data Platform
+# user-data-platform
 
-A system that always has access to user information — built on first principles.
+> External-agent samples and design notes for [Hushh](https://github.com/hushh-labs/hushh-research).
 
-## Core Concept
+This repo started as a from-scratch design for an "always-on user
+data platform." After reading
+[hushh-labs/hushh-research](https://github.com/hushh-labs/hushh-research),
+it became clear that the platform thesis (consent-first, BYOK,
+zero-knowledge, scoped capability tokens) is already shipped there in
+production form. So this repo was repurposed:
 
-One universal Postgres table with one row per user and infinitely extensible JSONB columns, layered with a trust/consent control plane, a Redis cache as the primary read path, and Kafka as the event backbone.
+- A short **principles note** that names the trust contract in plain
+  language: [`docs/04_principles.md`](docs/04_principles.md).
+- A runnable **external-agent sample** that consumes the public
+  `/api/v1` developer API + decrypts a scoped export client-side:
+  [`samples/external-agent/`](samples/external-agent/).
+- A 60-second **Claude Desktop demo** that wires the public MCP
+  endpoint into Claude: [`samples/claude-desktop/`](samples/claude-desktop/).
 
-```
-External Sources → Ingestion Service → Event Bus (Kafka)
-                                              ↓
-                                   User Profile Store (Postgres)
-                                              ↓
-                                       Cache (Redis)
-                                              ↓
-                             API Gateway → Authorized Services
-                                              ↓
-                                    Audit Logging (S3)
-```
+## What's in `docs/`
 
-## Services
-
-| Service | Description |
+| File | Purpose |
 |---|---|
-| `user-profile-service` | CRUD on the users table; source of truth |
-| `ingestion-service` | Multi-source data ingest, normalization, dedup |
-| `audit-logging-service` | Immutable R/W log consumer from Kafka |
+| [`01_hushh_findings.md`](docs/01_hushh_findings.md) | What's in the upstream Hushh repo — stack, trust contract, shipped pieces, token model, agent ontology, layers, operating rules. |
+| [`02_gap_analysis.md`](docs/02_gap_analysis.md) | Side-by-side of the original v0 design vs. what Hushh already ships; conflicts and real gaps. |
+| [`03_plan.md`](docs/03_plan.md) | Decision, deliverables, sequencing, open questions. |
+| [`04_principles.md`](docs/04_principles.md) | The four invariants — one-page mental model. |
+| [`MANISH_RESPONSE.md`](docs/MANISH_RESPONSE.md) | Draft reply to Manish referencing the above. |
 
-## Quick Start
+## What's in `samples/`
 
-```bash
-docker-compose up --build
-```
-
-Services:
-- User Profile Service: http://localhost:8001/docs
-- Ingestion Service: http://localhost:8002/docs
-- Audit Logging Service: http://localhost:8003/docs
-- Kafka UI: http://localhost:8080
-- PgAdmin: http://localhost:5050
+| Path | What it is |
+|---|---|
+| [`external-agent/`](samples/external-agent/) | FastAPI agent that runs the full `/api/v1` flow end-to-end: discover scope → request consent → poll → encrypted export → client-side X25519+AES-GCM decrypt → answer. Mock mode runs without a developer token. |
+| [`claude-desktop/`](samples/claude-desktop/) | `claude_desktop_config.json` snippet + README for the visceral "Claude reads my consented vault" demo. |
 
 ## Verified end-to-end
 
-The stack was brought up via `docker compose up -d --build` and exercised:
+- `samples/external-agent/` mock mode runs locally, exercises the
+  documented X25519-AES256-GCM decrypt path against a wire-shape
+  correct synthetic export — see
+  [`samples/external-agent/RUN.md`](samples/external-agent/RUN.md).
+- Live mode requires a `HUSHH_DEVELOPER_TOKEN` from
+  `https://uat.kai.hushh.ai/developers`. No code changes — env only.
 
-```
-POST /users                              → 201 {id: ...}
-GET  /users/{id}      (cache miss)       → full row from Postgres
-GET  /users/{id}      (cache hit)        → same row from Redis
-GET  /users/{id}?scope=profile.name      → response filtered to scope
-POST /ingest oauth_profile               → 2 fields updated, 1 deduped
-POST /ingest location_update             → 1 field updated
-GET  /users/{id}                         → merged state across sources
-GET  /users/{id}/history                 → 3 entries with old/new values
-```
+## What this repo is not
 
-Kafka topics produced: `user.created`, `user.updated`, `user.accessed`.
-`audit-logging-service` consumed every event and emitted structured JSON
-records to stdout (production target: S3 Parquet via Kinesis Firehose).
-
-## Design
-
-See [docs/DESIGN.md](docs/DESIGN.md) for the full system design.
-
-## Schema
-
-See [schema/migrations/](schema/migrations/) for all SQL migrations.
+- Not a fork or replacement of `hushh-research`. It is a downstream
+  consumer.
+- Not an attempt to redesign the consent protocol. That document lives
+  upstream at
+  [`consent-protocol/docs/reference/consent-protocol.md`](https://github.com/hushh-labs/hushh-research/blob/main/consent-protocol/docs/reference/consent-protocol.md).
+- Not a finished product. It is the smallest readable surface that
+  helps an external developer understand and exercise the platform.
