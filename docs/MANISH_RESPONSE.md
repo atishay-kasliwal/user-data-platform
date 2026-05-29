@@ -8,23 +8,66 @@ Hey Manish,
 
 Hope Paris is going well. Quick update.
 
-**Core principle (after our conversation):** the system reduces to a universal Postgres table — one row per user, JSONB columns for infinitely extensible attributes — with a trust/consent layer on top, Redis as the hot read path, and Kafka as the event bus. No new infrastructure invented, no schema migrations as new categories of personal data show up, and "ask once / remember forever" consent is persisted as a real DB row (not a JWT claim or config flag). Redis is what services actually read; Postgres is durable truth but never the hot path. That's how we deliver low-latency "always has access" at 8B-user scale from day zero.
+**What I did first.** I designed a v0 "always-on user data platform"
+from first principles, ended up at a universal Postgres + JSONB table
+with a consent table, Redis hot-read path, and Kafka backbone.
 
-**Built, tested live, and pushed:** https://github.com/atishay-kasliwal/user-data-platform
+**Then I read the upstream `hushh-research` repo.** Most of what I'd
+designed already ships there in stronger form — Capability Tokens
+with VAULT_OWNER + scoped + dev-token hierarchy, BYOK with
+client-side PBKDF2, ciphertext-only `pkm_blobs` and segmented PKM,
+the `/api/v1` developer surface, the hosted MCP server, and Agent
+Kai. Three of my v0's four moves directly contradicted the
+non-negotiables in your `AGENTS.md` (server stored plaintext, no key
+boundary, scope-as-row instead of scope-as-token). So I stopped
+building a parallel path and sequenced around the existing trust
+contract instead.
 
-- `docs/DESIGN.md` — full design with read/write paths, scaling strategy, security model
-- SQL migrations — `users`, `user_history`, `consent_grants` with RLS policies
-- Three FastAPI services — Profile (CRUD + history + consent), Ingestion (multi-source normalize + dedup), Audit Logging (Kafka consumer)
-- `docker-compose.yml` — full local stack: Postgres, Redis, Kafka, plus PgAdmin and Kafka UI
-- End-to-end verified locally: create → cache hit/miss → scoped read → ingest from oauth_profile + location → merged state → history → audit log via Kafka. Summary table in the README.
+**What I shipped this week, in this repo:**
 
-**Next steps I'd like to take:**
+1. A one-page **principles note** — the four invariants of the trust
+   contract in plain language, aligned with what
+   `consent-protocol/docs/reference/consent-protocol.md` already
+   encodes. Written so a new developer can answer "what does this
+   platform promise the user?" in one sitting.
+2. A runnable **external-agent sample** — the smallest FastAPI
+   personal agent that does the full developer flow: discover scope
+   → request consent → poll → encrypted scoped export → client-side
+   X25519 ECDH + AES-256-GCM decrypt → answer. Mock mode runs without
+   a token (verified locally, full decrypt path exercises the
+   documented wire shape). Live mode flips with one env var.
+3. A **Claude Desktop demo** — six-line `claude_desktop_config.json`
+   that points Claude at the public MCP endpoint. The visceral
+   version of the invariants: ask Claude, get a push on your phone,
+   approve, watch Claude answer with consented data the server never
+   read in plaintext.
 
-1. Drop me the research repo URL (you mentioned a PR there) and I'll mirror this work into a PR structured the way your team prefers.
-2. Happy to add the day-zero "claim" flows we discussed (NFC tag, OAuth-prefilled row, etc.) once we align on which surfaces to ship on first.
-3. Short sync with Kushal whenever convenient so I'm not duplicating against Hussh's One architecture.
+This is the "extreme ease of use with a few samples" surface you
+asked for. There is no end-to-end external-developer sample in
+`hushh-research` today — that was the real gap.
 
-Using Claude Code as my day-to-day workspace — happy to share session links if useful.
+**Repo + workspace:**
+- Code: https://github.com/atishay-kasliwal/user-data-platform
+- Branch with this week's work: `samples/external-agent`
+- Claude Code session driving the work: [will share in reply]
+
+**Three questions before I land it in your research repo:**
+
+1. Do you want this PR'd into `hushh-research` as
+   `samples/external-agent/` and `samples/claude-desktop/`, or kept
+   as a standalone `hushh-labs/hushh-agent-sample` you can point
+   developers at independently?
+2. Can your team issue me a `HUSHH_DEVELOPER_TOKEN` in UAT (or point
+   me at someone with a vault I can read for testing)? Live mode is
+   ready; only env is missing.
+3. You mentioned the problem statement you'd given me — could you
+   resend it? I want to make sure the principles note maps to it
+   directly rather than paraphrasing.
+
+Happy to hop on a call when you're back, or keep going async — I'm
+making progress every day. Will not push to `consent-protocol/`
+without alignment with Kushal; his recent revamp (PR #615) is on my
+radar.
 
 Best,
 Atishay
