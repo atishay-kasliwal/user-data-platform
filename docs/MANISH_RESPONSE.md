@@ -71,11 +71,17 @@ Transcript with redacted tokens lives at
 `samples/external-agent/RUN_LIVE.md`. While doing this, the sample
 caught **three real bugs in the production developer surface**:
 
-1. The production backend's `request-consent` response emits a
-   `request_url` pointing at `uat.kai.hushh.ai` — same UAT/prod
-   inline split visible in the example configs on
-   `hushh.ai/developers`. A developer following the link blindly
-   lands in an environment that doesn't contain their request.
+1. **The production developer flow is structurally split.** The
+   Cloud Run consent-protocol backend at `hushh.ai`-branded URLs
+   creates requests; the production Kai approval UI at
+   `kai.hushh.ai/consents` cannot see them. Verified empirically:
+   a fresh request with confirmed `pending` server-side state shows
+   up as "No Pending Requests" in the production Kai consent
+   management UI when signed in as the same Google account. The
+   only path that completes today routes through `uat.kai.hushh.ai`
+   — which is what the server itself emits, but contradicts the
+   "Production" framing of the developer portal. Same UAT/prod
+   split is visible in the example configs on `hushh.ai/developers`.
 2. `/health` says `One` is primary now, but `docs/vision/README.md`
    still describes the runtime as Kai-first. Docs lag the runtime.
 3. **High-severity:** `scoped-export` rejects email/phone user_ids
