@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "hushh-consent": {
+      "url": "https://api.uat.hushh.ai/mcp/?token=<HUSHH_DEVELOPER_TOKEN>"
+    }
+  }
+}
