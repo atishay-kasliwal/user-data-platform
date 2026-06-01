@@ -26,7 +26,6 @@ production form. So this repo was repurposed:
 | [`03_plan.md`](docs/03_plan.md) | Decision, deliverables, sequencing, open questions. |
 | [`04_principles.md`](docs/04_principles.md) | The four invariants — one-page mental model + why they're also the cheapest/fastest shape. |
 | [`05_roadmap.md`](docs/05_roadmap.md) | 90-day forward plan — seven tiles, sequenced so each multiplies the value of the next. |
-| [`MANISH_RESPONSE.md`](docs/MANISH_RESPONSE.md) | Draft reply to Manish referencing the above. |
 
 ## What's in `samples/`
 
