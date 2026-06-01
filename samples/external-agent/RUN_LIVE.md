@@ -93,7 +93,7 @@ until the request becomes a grant.
 
 ## Findings worth flagging back to Hushh
 
-### Finding 1 — production-vs-UAT URL mismatch in `request-consent` response
+### Finding 1 — production developer flow is structurally split between the consent-protocol backend and the Kai approval UI (HIGH)
 
 The `request-consent` response we received from the **production**
 backend contains:
@@ -104,20 +104,51 @@ backend contains:
 ```
 
 `uat.kai.hushh.ai` is the UAT Kai host. The production Kai host
-(verified live with HTTP 200) is `kai.hushh.ai`. A developer
-following the `request_url` blindly will land on a UAT environment
-that doesn't contain the consent request they just created, because
-the consent was created in production.
+(verified live with HTTP 200) is `kai.hushh.ai`. Initial read: a
+developer following `request_url` blindly lands in a UAT environment
+that doesn't contain the consent request they just created.
 
-This is consistent with the inconsistency already visible on the
-developer portal at `https://hushh.ai/developers`: the page title
-says "Production" and the REST/MCP base URLs point at the Cloud
-Run production backend, but the **example** `Remote MCP config`,
-`npm bridge config`, and `Claude Desktop stdio` config snippets all
-still inline `https://api.uat.hushh.ai`.
+Stronger empirical evidence — a fresh request
+(`req_42f42799235b411b835cd1a11af3`) was created via the production
+MCP endpoint with `Atishay Kasliwal` as the developer-app identity:
 
-Same root cause: the production developer surface still emits UAT
-URLs in places. Likely a one-line config flip.
+- Server side: REST `consent-status` returns `pending` with the
+  request payload intact.
+- User side: the **production** Kai consent management UI at
+  `https://kai.hushh.ai/consents?tab=pending` shows
+  **"No Pending Requests"** when signed in as the same Google
+  account that authored the dev app.
+
+The screenshot from that page shows an explicitly empty state with
+the prompt *"When developers request access to your data, it will
+appear here."* The request exists in the backend; the user-facing
+production approval surface cannot see it.
+
+Two surfaces both legitimately at `hushh.ai`-branded URLs do not
+share state. Until that is fixed, no external developer can complete
+a closed loop on production: they can create a consent request, but
+the user they are integrating with has no surface in which to
+approve it. The previous-run grant (`req_c8242d841cbb…`) that did
+move to `granted` likely went through `uat.kai.hushh.ai` (matching
+the URL the server emitted), so the *only* path that actually
+completes today is one the server itself documents as wrong.
+
+This is consistent with the inline split visible on
+`https://hushh.ai/developers`: the page title says "Production" and
+the REST/MCP base URLs point at the Cloud Run production backend,
+but the example `Remote MCP config`, `npm bridge config`, and
+`Claude Desktop stdio` config snippets all inline
+`https://api.uat.hushh.ai`. Same root cause.
+
+Likely fixes (any one closes this):
+1. Have the production Kai UI read from the production
+   consent-protocol backend, not just the UAT one.
+2. Have `request-consent` emit a `request_url` that matches the
+   environment it was called against, instead of hard-coded
+   `uat.kai.hushh.ai`.
+3. Until either of the above ships, document explicitly that
+   production developer access exists but routes consent approval
+   through UAT.
 
 ### Finding 2 — `/health` reports `One` as primary
 
@@ -284,7 +315,7 @@ Finding 3 is fixed.
 
 | # | Severity | Finding |
 |---|---|---|
-| 1 | Medium | Production `request-consent` response emits `request_url` pointing at `uat.kai.hushh.ai`. Same pattern in portal example configs. Likely a one-line config flip. |
+| 1 | **High** | Production developer flow is structurally split. The Cloud Run consent-protocol backend at `hushh.ai`-branded URLs creates requests that the production Kai approval UI at `kai.hushh.ai/consents` cannot see (verified: "No Pending Requests" with a known-existing pending request). Closed loop is currently only possible via the UAT Kai UI that the server itself points at. |
 | 2 | Informational | `/health` shows `One` is primary in production runtime. `docs/vision/README.md` still describes the runtime as "Kai-first until the One/Nav migration lands." Docs should be updated to current state. |
 | 3 | **High** | `scoped-export` rejects email/phone user_ids that every other `/api/v1` endpoint accepts. No documented way to resolve email → Firebase UID. Blocks the full external-developer loop. |
 
