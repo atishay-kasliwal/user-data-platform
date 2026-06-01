@@ -237,6 +237,22 @@ raw `/api/v1` caller to discover the canonical Firebase UID for a
 user they're integrating with. They can request and receive consent
 using an email, then can't read.
 
+Empirical evidence — every reasonable identity-resolution probe
+returns 404:
+
+```
+GET /api/v1/me                                          → 404
+GET /api/v1/whoami                                      → 404
+GET /api/v1/resolve?email=katishay@gmail.com            → 404
+GET /api/v1/users/me                                    → 404
+GET /api/v1/identity/resolve?email=katishay@gmail.com   → 404
+```
+
+`/api/developer/access` exists but rejects the developer token
+("Invalid Firebase ID token") — it requires the Firebase ID token,
+not the dev token, so it isn't reachable from a raw external
+integration either.
+
 This is the loop-closing bug for external developers. Fixing it
 unlocks the full external-agent path the developer portal is
 positioning.
