@@ -1,54 +1,81 @@
 # user-data-platform
 
-> External-agent samples and design notes for [Hushh](https://github.com/hushh-labs/hushh-research).
+> A runnable client for consent-based, zero-knowledge personal data
+> access — an external agent that requests a user's consent, receives
+> an encrypted export, and decrypts it **client-side** so the data
+> provider's server never sees plaintext.
 
-This repo started as a from-scratch design for an "always-on user
-data platform." After reading
-[hushh-labs/hushh-research](https://github.com/hushh-labs/hushh-research),
-it became clear that the platform thesis (consent-first, BYOK,
-zero-knowledge, scoped capability tokens) is already shipped there in
-production form. So this repo was repurposed:
+Built against [Hushh](https://github.com/hushh-labs/hushh-research)'s
+public developer API. Demonstrates: applied cryptography (X25519 ECDH +
+AES-256-GCM), async API client design, and a security model where
+consent is enforced by math, not by a database flag.
 
-- A short **principles note** that names the trust contract in plain
-  language: [`docs/04_principles.md`](docs/04_principles.md).
-- A runnable **external-agent sample** that consumes the public
-  `/api/v1` developer API + decrypts a scoped export client-side:
-  [`samples/external-agent/`](samples/external-agent/).
-- A 60-second **Claude Desktop demo** that wires the public MCP
-  endpoint into Claude: [`samples/claude-desktop/`](samples/claude-desktop/).
+## Try it in 30 seconds
 
-## What's in `docs/`
+```bash
+git clone <this-repo> && cd user-data-platform/samples/external-agent
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+MODE=mock LLM_PROVIDER=stub .venv/bin/uvicorn main:app --port 8765
+```
 
-| File | Purpose |
-|---|---|
-| [`01_hushh_findings.md`](docs/01_hushh_findings.md) | What's in the upstream Hushh repo — stack, trust contract, shipped pieces, token model, agent ontology, layers, operating rules. |
-| [`02_gap_analysis.md`](docs/02_gap_analysis.md) | Side-by-side of the original v0 design vs. what Hushh already ships; conflicts and real gaps. |
-| [`03_plan.md`](docs/03_plan.md) | Decision, deliverables, sequencing, open questions. |
-| [`04_principles.md`](docs/04_principles.md) | The four invariants — one-page mental model + why they're also the cheapest/fastest shape. |
-| [`05_roadmap.md`](docs/05_roadmap.md) | 90-day forward plan — seven tiles, sequenced so each multiplies the value of the next. |
+```bash
+curl -s -X POST http://127.0.0.1:8765/ask \
+  -H 'content-type: application/json' \
+  -d '{"scope":"attr.financial.*","question":"what were my biggest losers?"}'
+```
 
-## What's in `samples/`
+No account or API key needed — mock mode runs the full flow, including
+real decryption, against a synthetic export. See
+[`samples/external-agent/RUN.md`](samples/external-agent/RUN.md) for
+the verified output.
+
+## The flow
+
+```
+discover scope → request consent → poll for approval →
+fetch encrypted export → decrypt client-side (X25519 + AES-256-GCM) →
+answer the question
+```
+
+The connector's private key is generated at process start and never
+leaves it. The server holds ciphertext only — it has no ability to
+read the data it's transporting, by construction, not by policy.
+
+## What's in this repo
 
 | Path | What it is |
 |---|---|
-| [`external-agent/`](samples/external-agent/) | FastAPI agent that runs the full `/api/v1` flow end-to-end: discover scope → request consent → poll → encrypted export → client-side X25519+AES-GCM decrypt → answer. Mock mode runs without a developer token. |
-| [`claude-desktop/`](samples/claude-desktop/) | `claude_desktop_config.json` snippet + README for the visceral "Claude reads my consented vault" demo. |
+| [`samples/external-agent/`](samples/external-agent/) | FastAPI agent implementing the flow above end-to-end. Mock mode needs nothing; live mode needs a `HUSHH_DEVELOPER_TOKEN`. |
+| [`samples/claude-desktop/`](samples/claude-desktop/) | Config snippet wiring the same consented vault into Claude Desktop via MCP. |
+| [`docs/`](docs/) | Design notes: findings from the upstream protocol, a gap analysis against an earlier from-scratch design, the four trust invariants, and a 90-day roadmap. Start with [`docs/04_principles.md`](docs/04_principles.md) for the one-page mental model. |
 
-## Verified end-to-end
+## Verified
 
-- `samples/external-agent/` mock mode runs locally, exercises the
-  documented X25519-AES256-GCM decrypt path against a wire-shape
-  correct synthetic export — see
+- Mock mode: runs locally, no external calls, exercises the full
+  decrypt path (ECDH → SHA-256 → AES-GCM unwrap → AES-GCM decrypt)
+  against a wire-shape-correct synthetic export —
   [`samples/external-agent/RUN.md`](samples/external-agent/RUN.md).
-- Live mode requires a `HUSHH_DEVELOPER_TOKEN` from
-  `https://uat.kai.hushh.ai/developers`. No code changes — env only.
+- Live mode: implemented against the documented `/api/v1` contract;
+  requires a `HUSHH_DEVELOPER_TOKEN` from
+  `https://uat.kai.hushh.ai/developers` to run against real data — see
+  [`samples/external-agent/RUN_LIVE.md`](samples/external-agent/RUN_LIVE.md).
+
+## Background
+
+This started as an original design for an "always-on user data
+platform." Once it became clear the same thesis — consent-first, BYOK,
+zero-knowledge, scoped capability tokens — already ships in production
+at [hushh-labs/hushh-research](https://github.com/hushh-labs/hushh-research),
+this repo was repurposed into a downstream client and a plain-language
+explanation of that trust model, rather than a competing design. The
+reasoning behind that call is in [`docs/02_gap_analysis.md`](docs/02_gap_analysis.md)
+and [`docs/03_plan.md`](docs/03_plan.md).
 
 ## What this repo is not
 
-- Not a fork or replacement of `hushh-research`. It is a downstream
+- Not a fork or replacement of `hushh-research` — it's a downstream
   consumer.
-- Not an attempt to redesign the consent protocol. That document lives
-  upstream at
-  [`consent-protocol/docs/reference/consent-protocol.md`](https://github.com/hushh-labs/hushh-research/blob/main/consent-protocol/docs/reference/consent-protocol.md).
-- Not a finished product. It is the smallest readable surface that
-  helps an external developer understand and exercise the platform.
+- Not a proposal to change the consent protocol. That lives upstream
+  at [`consent-protocol/docs/reference/consent-protocol.md`](https://github.com/hushh-labs/hushh-research/blob/main/consent-protocol/docs/reference/consent-protocol.md).
+- Not a finished product — the smallest readable surface for
+  understanding and exercising the platform as an external developer.
